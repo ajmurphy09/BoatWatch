@@ -1,0 +1,19 @@
+{
+  "status": "starting",
+  "last_attempt": null,
+  "last_success": null,
+  "error": null,
+  "site": {
+    "id": "m35_family",
+    "name": "M-35 Family Watch Area"
+  },
+  "settings": {
+    "visible_radius_miles": 15.0,
+    "max_collection_radius_miles": 50.0,
+    "cloud_snapshot_interval_minutes": 5
+  },
+  "visible_now": [],
+  "coming_up": [],
+  "background": [],
+  "stats": {}
+}
