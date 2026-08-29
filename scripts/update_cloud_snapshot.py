@@ -154,6 +154,22 @@ def visibility_assessment(distance_miles: float, length_ft: int | None) -> tuple
     return "UNLIKELY VISIBLE", "Outside the configured 15-mile visible zone"
 
 
+
+def eta_to_visible_zone_minutes(distance_miles: float, speed_knots: float,
+                                movement_status: str) -> int | None:
+    """Approximate ETA to the configured visible-zone boundary."""
+    if movement_status != "APPROACHING":
+        return None
+    if distance_miles <= VISIBLE_RADIUS_MILES:
+        return 0
+    if speed_knots <= 0.5:
+        return None
+
+    speed_mph = speed_knots * 1.15078
+    minutes = ((distance_miles - VISIBLE_RADIUS_MILES) / speed_mph) * 60.0
+    return max(1, round(minutes))
+
+
 def movement_explanation(status: str, speed: float, distance: float,
                          cpa_distance: float, cpa_minutes: int) -> str:
     if status == "STATIONARY":
@@ -281,6 +297,9 @@ def build_snapshot() -> dict:
             "visibility_reason": visibility_reason,
             "cpa_distance_miles": round(cpa_distance, 2),
             "cpa_minutes": cpa_minutes,
+            "eta_visible_minutes": eta_to_visible_zone_minutes(
+                current_distance, speed, movement_status
+            ),
             "destination": vessel.get("destination"),
             "ais_timestamp": vessel.get("ts"),
             "age_minutes": round(age, 1),

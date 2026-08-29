@@ -531,6 +531,114 @@
         }
 
 
+
+        .visible-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .visible-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .visible-card-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: flex-start;
+        }
+
+        .visible-card-distance {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .visible-card-distance strong {
+            display: block;
+            color: var(--green);
+            font-size: 30px;
+            line-height: 1;
+        }
+
+        .look-direction {
+            margin-top: 6px;
+            color: var(--navy);
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .coming-eta-label {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+
+        .coming-eta {
+            margin-top: 3px;
+            color: var(--green);
+            font-size: 25px;
+            font-weight: 900;
+            line-height: 1.1;
+        }
+
+        .details-link {
+            margin-top: 10px;
+            border: 0;
+            background: transparent;
+            color: var(--navy);
+            padding: 0;
+            font-weight: 900;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .details-drawer {
+            display: none;
+            margin-top: 12px;
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .details-drawer.open {
+            display: block;
+        }
+
+        .background-toggle {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            color: inherit;
+            cursor: pointer;
+        }
+
+        .background-toggle .background-heading {
+            margin: 0;
+        }
+
+        .background-chevron {
+            margin-left: 10px;
+            font-size: 18px;
+            transition: transform .15s ease;
+        }
+
+        .background-chevron.open {
+            transform: rotate(180deg);
+        }
+
+        .background-body.collapsed {
+            display: none;
+        }
+
         .test-mode-banner {
             display: none;
             background: #fff2cc;
@@ -685,30 +793,40 @@
             </div>
 
             <div class="background-box">
-                <div class="background-heading">
-                    <div class="background-title">
-                        BACKGROUND
-                    </div>
+                <button
+                    class="background-toggle"
+                    type="button"
+                    onclick="toggleBackground()"
+                >
+                    <div class="background-heading">
+                        <div class="background-title">
+                            BACKGROUND
+                            <span
+                                id="background-chevron"
+                                class="background-chevron"
+                            >⌄</span>
+                        </div>
 
-                    <div class="count">
-                        <div
-                            class="count-number"
-                            id="background-count"
-                        >0</div>
-                        <div class="count-label">
-                            VESSELS
+                        <div class="count">
+                            <div
+                                class="count-number"
+                                id="background-count"
+                            >0</div>
+                            <div class="count-label">
+                                VESSELS
+                            </div>
                         </div>
                     </div>
-                </div>
+                </button>
 
-                <div class="background-explanation">
-                    These vessels are valid AIS targets within
-                    50 miles, but are not in the visible zone and
-                    not expected to enter soon. They are shown here
-                    for situational awareness.
-                </div>
+                <div id="background-body" class="background-body collapsed">
+                    <div class="background-explanation">
+                        Valid AIS targets within 50 miles that are not
+                        currently visible and not expected to enter soon.
+                    </div>
 
-                <div id="background-container"></div>
+                    <div id="background-container"></div>
+                </div>
             </div>
         </section>
     </main>
@@ -809,6 +927,44 @@
         }
 
 
+
+        function etaVisibleText(vessel) {
+            const eta = vessel.eta_visible_minutes;
+            if (eta === null || eta === undefined) return "ETA unavailable";
+            if (eta <= 0) return "In visible zone now";
+            if (eta < 60) return `~${eta} min`;
+            const hours = Math.floor(eta / 60);
+            const mins = eta % 60;
+            return mins ? `~${hours}h ${mins}m` : `~${hours}h`;
+        }
+
+        function detailsHtml(vessel) {
+            return `
+                <div><strong>Type:</strong> ${escapeHtml(vessel.vessel_type || "Unknown")}</div>
+                <div><strong>Raw AIS type:</strong> ${escapeHtml(vessel.vessel_type_raw || "Not supplied")}</div>
+                <div><strong>Length:</strong> ${vessel.length_ft ? vessel.length_ft + " ft" : "Not supplied"}</div>
+                <div><strong>Call sign:</strong> ${escapeHtml(vessel.callsign || "Not supplied")}</div>
+                <div><strong>IMO:</strong> ${escapeHtml(vessel.imo || "Not supplied")}</div>
+                <div><strong>MMSI:</strong> ${escapeHtml(vessel.mmsi)}</div>
+                <div><strong>Destination:</strong> ${escapeHtml(vessel.destination || "Not supplied")}</div>
+                <div><strong>AIS age:</strong> ${Number(vessel.age_minutes || 0).toFixed(1)} min</div>
+                <div><strong>Source:</strong> ${escapeHtml(vessel.source || "AIS")}</div>
+            `;
+        }
+
+        function toggleDrawer(id) {
+            const drawer = document.getElementById(id);
+            if (drawer) drawer.classList.toggle("open");
+        }
+
+        function toggleBackground() {
+            const body = document.getElementById("background-body");
+            const chevron = document.getElementById("background-chevron");
+            if (!body) return;
+            body.classList.toggle("collapsed");
+            if (chevron) chevron.classList.toggle("open");
+        }
+
         const TEST_MODE =
             new URLSearchParams(window.location.search).get("test") === "1";
 
@@ -852,6 +1008,7 @@
                             "Large vessel within the visible zone",
                         cpa_distance_miles: 3.8,
                         cpa_minutes: 19,
+                        eta_visible_minutes: 0,
                         destination: "GREEN BAY"
                     },
                     {
@@ -877,6 +1034,7 @@
                             "Within the visible zone; haze and vessel size matter",
                         cpa_distance_miles: 11.4,
                         cpa_minutes: 0,
+                        eta_visible_minutes: 0,
                         destination: null
                     }
                 ],
@@ -904,6 +1062,7 @@
                             "Outside the configured 15-mile visible zone",
                         cpa_distance_miles: 8.1,
                         cpa_minutes: 47,
+                        eta_visible_minutes: 47,
                         destination: "MENOMINEE"
                     },
                     {
@@ -929,6 +1088,7 @@
                             "Outside the configured 15-mile visible zone",
                         cpa_distance_miles: 6.5,
                         cpa_minutes: 52,
+                        eta_visible_minutes: 44,
                         destination: null
                     }
                 ],
@@ -1193,32 +1353,69 @@
                 return;
             }
 
-            container.innerHTML =
-                renderPrimaryVessel(vessels[0]);
+            container.innerHTML = `
+                <div class="visible-list">
+                    ${vessels.map((v, index) => {
+                        if (index === 0) {
+                            return renderPrimaryVessel(v);
+                        }
 
-            if (vessels.length > 1) {
-                const extras = vessels.slice(1);
+                        const drawerId = `visible-details-${index}`;
 
-                container.innerHTML += `
-                    <div style="margin-top:18px">
-                        ${extras.map(v => `
-                            <div class="coming-card">
-                                <div class="coming-name">
-                                    ${escapeHtml(v.name)}
+                        return `
+                            <article class="visible-card">
+                                <div class="visible-card-top">
+                                    <div>
+                                        <div class="coming-name">
+                                            ${escapeHtml(v.name)}
+                                        </div>
+                                        <div class="vessel-type-line">
+                                            ${vesselIdentity(v)}
+                                        </div>
+                                        <div class="badge-row">
+                                            <span class="visibility-pill ${visibilityClass(v.visibility_label)}">
+                                                ${escapeHtml(v.visibility_label || "VISIBILITY UNKNOWN")}
+                                            </span>
+                                            ${badgeHtml(v)}
+                                        </div>
+
+                                        <div class="plain-english">
+                                            ${escapeHtml(v.movement_explanation || "")}
+                                        </div>
+
+                                        <div class="look-direction">
+                                            Look ${escapeHtml(v.direction)}
+                                            • ${v.bearing_degrees.toFixed(1)}°
+                                        </div>
+                                    </div>
+
+                                    <div class="visible-card-distance">
+                                        <strong>
+                                            ${v.distance_miles.toFixed(1)} mi
+                                        </strong>
+                                        away
+                                    </div>
                                 </div>
-                                <div class="plain-english">
-                                ${escapeHtml(v.movement_explanation || "")}
-                            </div>
-                            <div class="coming-details">
-                                    ${v.distance_miles.toFixed(2)} mi •
-                                    ${escapeHtml(v.direction)} •
-                                    ${escapeHtml(v.movement_status)}
+
+                                <button
+                                    class="details-link"
+                                    type="button"
+                                    onclick="toggleDrawer('${drawerId}')"
+                                >
+                                    Vessel details
+                                </button>
+
+                                <div
+                                    class="details-drawer"
+                                    id="${drawerId}"
+                                >
+                                    ${detailsHtml(v)}
                                 </div>
-                            </div>
-                        `).join("")}
-                    </div>
-                `;
-            }
+                            </article>
+                        `;
+                    }).join("")}
+                </div>
+            `;
         }
 
         function renderComing(vessels) {
@@ -1243,33 +1440,58 @@
 
             container.innerHTML = `
                 <div class="coming-list">
-                    ${vessels.map(v => `
-                        <div class="coming-card">
-                            <div class="coming-name">
-                                ${escapeHtml(v.name)}
-                            </div>
-                            <div class="vessel-type-line">
-                                ${vesselIdentity(v)}
-                            </div>
-                            <div class="badge-row">
-                                <span class="visibility-pill ${visibilityClass(v.visibility_label)}">
-                                    ${escapeHtml(v.visibility_label || "VISIBILITY UNKNOWN")}
-                                </span>
-                                ${badgeHtml(v)}
-                            </div>
+                    ${vessels.map((v, index) => {
+                        const drawerId = `coming-details-${index}`;
 
-                            <div class="plain-english">
-                                ${escapeHtml(v.movement_explanation || "")}
+                        return `
+                            <div class="coming-card">
+                                <div class="coming-name">
+                                    ${escapeHtml(v.name)}
+                                </div>
+
+                                <div class="vessel-type-line">
+                                    ${vesselIdentity(v)}
+                                </div>
+
+                                <div class="badge-row">
+                                    ${badgeHtml(v)}
+                                </div>
+
+                                <div class="coming-eta-label">
+                                    Estimated time to visible zone
+                                </div>
+                                <div class="coming-eta">
+                                    ${etaVisibleText(v)}
+                                </div>
+
+                                <div class="plain-english">
+                                    ${escapeHtml(v.movement_explanation || "")}
+                                </div>
+
+                                <div class="coming-details">
+                                    Now ${v.distance_miles.toFixed(1)} mi away •
+                                    ${escapeHtml(v.direction)} •
+                                    ${v.speed_knots.toFixed(1)} kt •
+                                    closest pass ${v.cpa_distance_miles.toFixed(1)} mi
+                                </div>
+
+                                <button
+                                    class="details-link"
+                                    type="button"
+                                    onclick="toggleDrawer('${drawerId}')"
+                                >
+                                    Vessel details
+                                </button>
+
+                                <div
+                                    class="details-drawer"
+                                    id="${drawerId}"
+                                >
+                                    ${detailsHtml(v)}
+                                </div>
                             </div>
-                            <div class="coming-details">
-                                ${v.distance_miles.toFixed(2)} mi away •
-                                ${v.speed_knots.toFixed(1)} kt •
-                                closest pass
-                                ${v.cpa_distance_miles.toFixed(2)} mi
-                                in ~${v.cpa_minutes} min
-                            </div>
-                        </div>
-                    `).join("")}
+                        `;
+                    }).join("")}
                 </div>
             `;
         }
@@ -1306,31 +1528,48 @@
                     </thead>
 
                     <tbody>
-                        ${vessels.map(v => `
-                            <tr>
-                                <td class="vessel-name-cell">
-                                    ${escapeHtml(v.name)}
-                                </td>
+                        ${vessels.map((v, index) => {
+                            const drawerId = `background-details-${index}`;
+                            return `
+                                <tr>
+                                    <td class="vessel-name-cell">
+                                        ${escapeHtml(v.name)}
+                                        <br>
+                                        <button
+                                            class="details-link"
+                                            type="button"
+                                            onclick="toggleDrawer('${drawerId}')"
+                                        >
+                                            details
+                                        </button>
+                                        <div
+                                            class="details-drawer"
+                                            id="${drawerId}"
+                                        >
+                                            ${detailsHtml(v)}
+                                        </div>
+                                    </td>
 
-                                <td>
-                                    ${v.distance_miles.toFixed(1)} mi |
-                                    ${escapeHtml(v.direction)}
-                                </td>
+                                    <td>
+                                        ${v.distance_miles.toFixed(1)} mi |
+                                        ${escapeHtml(v.direction)}
+                                    </td>
 
-                                <td
-                                    class="
-                                        status
+                                    <td
+                                        class="
+                                            status
+                                            ${escapeHtml(v.movement_status)}
+                                        "
+                                    >
                                         ${escapeHtml(v.movement_status)}
-                                    "
-                                >
-                                    ${escapeHtml(v.movement_status)}
-                                </td>
+                                    </td>
 
-                                <td>
-                                    ${escapeHtml(backgroundReason(v))}
-                                </td>
-                            </tr>
-                        `).join("")}
+                                    <td>
+                                        ${escapeHtml(backgroundReason(v))}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join("")}
                     </tbody>
                 </table>
             `;

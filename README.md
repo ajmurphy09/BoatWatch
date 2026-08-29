@@ -60,3 +60,44 @@ This version adds:
 
 Visibility labels are estimates only and do not account for current haze,
 weather, terrain, or obstructions.
+
+
+## Dummy traffic test mode
+
+The production vessel feed remains untouched.
+
+To render test vessels in the browser, append:
+
+    ?test=1
+
+to the normal GitHub Pages URL.
+
+Example:
+
+    https://YOUR-USERNAME.github.io/BoatWatch/?test=1
+
+Test mode supplies:
+- 2 Visible Now vessels
+- 2 Coming Up vessels
+- 2 Background vessels
+- cargo, pleasure craft, tug, Coast Guard, research, and sailing examples
+- duplicate SELAH names for identity testing
+- visibility badges, movement explanations, CPA values, and metadata
+
+Remove `?test=1` to immediately return to real CESARops data.
+
+
+## UX upgrade
+
+This version makes each section answer a distinct question:
+
+- Visible Now: every visible vessel gets a useful identification card and a
+  prominent direction to look.
+- Coming Up: emphasizes estimated time to the 15-mile visible zone instead of
+  showing an "unlikely visible" badge.
+- Background: starts collapsed and can be expanded for situational awareness.
+- Every vessel can expose identifying details such as MMSI, call sign, IMO,
+  type, length, destination, AIS age, and source when the source provides them.
+
+The ETA to the visible-zone boundary is an approximation based on current
+distance, current speed, and an approaching status.
