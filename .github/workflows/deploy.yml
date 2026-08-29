@@ -37,7 +37,7 @@ jobs:
           SITE_LATITUDE: ${{ secrets.SITE_LATITUDE }}
           SITE_LONGITUDE: ${{ secrets.SITE_LONGITUDE }}
           SITE_NAME: "M-35 Family Watch Area"
-        run: python scripts/update_cloud_snapshot.py
+        run: PYTHONPATH=. python scripts/update_cloud_snapshot.py
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
