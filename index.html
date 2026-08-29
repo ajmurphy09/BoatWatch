@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BoatWatch</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <p class="eyebrow">GREAT LAKES VESSEL WATCH</p>
+        <h1>⚓ BoatWatch</h1>
+      </div>
+      <div id="status" class="status">Loading…</div>
+    </header>
+
+    <section class="summary">
+      <span id="count">—</span>
+      <span>vessels in the watch area</span>
+    </section>
+
+    <section id="vessels" class="grid" aria-live="polite"></section>
+
+    <footer>
+      <span id="updated">Last update: —</span>
+    </footer>
+  </main>
+
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+
+function ageLabel(iso) {
+  const d = new Date(iso);
+  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+  if (mins < 1) return "just now";
+  if (mins === 1) return "1 min ago";
+  if (mins < 60) return `${mins} min ago`;
+  const h = Math.round(mins / 60);
+  return `${h} hr${h === 1 ? "" : "s"} ago`;
+}
+
+async function load() {
+  const status = document.getElementById("status");
+  try {
+    const r = await fetch(`data/vessels.json?t=${Date.now()}`, {cache:"no-store"});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    const vessels = data.vessels || [];
+    document.getElementById("count").textContent = vessels.length;
+    document.getElementById("updated").textContent =
+      `Last update: ${new Date(data.generated_at).toLocaleString()}`;
+    status.textContent = data.mode === "mock" ? "DEMO DATA" : "LIVE";
+    status.className = `status ${data.mode === "mock" ? "demo" : "live"}`;
+
+    document.getElementById("vessels").innerHTML = vessels.length
+      ? vessels.map(v => `
+        <article class="card">
+          <div class="topline">
+            <h2>${esc(v.name || "Unknown vessel")}</h2>
+            <span class="distance">${v.distance_mi == null ? "" : `${Number(v.distance_mi).toFixed(1)} mi`}</span>
+          </div>
+          <p class="type">${esc(v.type || "Vessel")}</p>
+          <div class="facts">
+            <span>Speed <b>${v.speed_kn == null ? "—" : `${v.speed_kn} kn`}</b></span>
+            <span>Course <b>${v.course_deg == null ? "—" : `${v.course_deg}°`}</b></span>
+            <span>Length <b>${v.length_ft == null ? "—" : `${v.length_ft} ft`}</b></span>
+          </div>
+          <p class="seen">Seen ${esc(ageLabel(v.last_seen))}</p>
+        </article>
+      `).join("")
+      : `<div class="empty">No vessels currently reported in the watch area.</div>`;
+  } catch (err) {
+    status.textContent = "DATA ERROR";
+    status.className = "status error";
+    document.getElementById("vessels").innerHTML =
+      `<div class="empty">BoatWatch could not load vessel data.</div>`;
+    console.error(err);
+  }
+}
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
