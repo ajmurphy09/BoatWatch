@@ -1,11 +1,11 @@
-name: Update BoatWatch and deploy
+name: Update Green Bay Ship Watch
 
 on:
   workflow_dispatch:
   push:
     branches: ["main"]
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  update-and-deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -32,10 +32,14 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Refresh vessel data
-        run: python scripts/update_vessels.py
+      - name: Fetch and process live CESARops AIS
+        env:
+          SITE_LATITUDE: ${{ secrets.SITE_LATITUDE }}
+          SITE_LONGITUDE: ${{ secrets.SITE_LONGITUDE }}
+          SITE_NAME: "M-35 Family Watch Area"
+        run: python scripts/update_cloud_snapshot.py
 
-      - name: Configure Pages
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload site
@@ -43,6 +47,6 @@ jobs:
         with:
           path: "."
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
