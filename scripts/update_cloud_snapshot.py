@@ -40,6 +40,137 @@ def required_float(name: str) -> float:
     return float(value)
 
 
+def first_present(vessel: dict, *keys):
+    for key in keys:
+        value = vessel.get(key)
+        if value not in (None, "", "Unknown", "UNKNOWN"):
+            return value
+    return None
+
+
+def as_float(value):
+    try:
+        if value in (None, ""):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def vessel_length_ft(vessel: dict):
+    # Prefer an explicit overall length if CESARops supplies one.
+    direct = as_float(first_present(
+        vessel, "length_ft", "lengthFeet", "length_feet"
+    ))
+    if direct is not None and direct > 0:
+        return round(direct)
+
+    meters = as_float(first_present(
+        vessel, "length", "length_m", "lengthMeters", "ship_length"
+    ))
+    if meters is not None and meters > 0:
+        return round(meters * 3.28084)
+
+    # AIS static dimensions may be bow/stern distances in meters.
+    bow = as_float(first_present(vessel, "dim_bow", "to_bow", "dimensionToBow"))
+    stern = as_float(first_present(vessel, "dim_stern", "to_stern", "dimensionToStern"))
+    if bow is not None and stern is not None and bow + stern > 0:
+        return round((bow + stern) * 3.28084)
+
+    return None
+
+
+def raw_type_text(vessel: dict) -> str | None:
+    value = first_present(
+        vessel,
+        "ship_type_text", "shipTypeText", "type_name", "typeName",
+        "vessel_type", "vesselType", "type", "ship_type", "shipType",
+    )
+    return str(value).strip() if value is not None else None
+
+
+def friendly_vessel_type(vessel: dict) -> tuple[str, list[str]]:
+    raw = (raw_type_text(vessel) or "").strip()
+    upper = raw.upper()
+    name = str(vessel.get("name") or "").upper()
+    haystack = f"{upper} {name}"
+
+    badges = []
+
+    rules = (
+        (("COAST GUARD", "USCG"), "Coast Guard", "COAST GUARD"),
+        (("LAW ENFORCEMENT", "POLICE", "SHERIFF"), "Law enforcement vessel", "LAW ENFORCEMENT"),
+        (("SEARCH AND RESCUE", "RESCUE", "SAR"), "Search / rescue vessel", "RESCUE"),
+        (("PILOT",), "Pilot vessel", "PILOT"),
+        (("DREDG",), "Dredging vessel", "DREDGE"),
+        (("RESEARCH", "SURVEY"), "Research / survey vessel", "RESEARCH"),
+        (("TUG", "TOW"), "Tug / towing vessel", "TUG"),
+        (("FISH",), "Fishing vessel", "FISHING"),
+        (("PASSENGER", "FERRY"), "Passenger vessel", "PASSENGER"),
+        (("PLEASURE", "YACHT"), "Pleasure craft", "PLEASURE CRAFT"),
+        (("SAIL",), "Sailing vessel", "SAILING"),
+        (("CARGO", "FREIGHT", "BULK", "CARRIER"), "Cargo / bulk vessel", "CARGO"),
+        (("TANKER",), "Tanker", "TANKER"),
+    )
+
+    for needles, label, badge in rules:
+        if any(n in haystack for n in needles):
+            badges.append(badge)
+            return label, badges
+
+    # Numeric AIS ship type when exposed by the source.
+    try:
+        code = int(float(raw))
+    except (TypeError, ValueError):
+        code = None
+
+    if code is not None:
+        if 30 <= code <= 39:
+            return "Special-purpose / fishing vessel", ["SPECIAL PURPOSE"]
+        if 40 <= code <= 49:
+            return "High-speed craft", ["HIGH SPEED"]
+        if 60 <= code <= 69:
+            return "Passenger vessel", ["PASSENGER"]
+        if 70 <= code <= 79:
+            return "Cargo vessel", ["CARGO"]
+        if 80 <= code <= 89:
+            return "Tanker", ["TANKER"]
+
+    return (raw if raw else "Vessel"), badges
+
+
+def visibility_assessment(distance_miles: float, length_ft: int | None) -> tuple[str, str]:
+    # Deliberately conservative: this is a viewing aid, not a guarantee.
+    if distance_miles <= 5:
+        return "LIKELY VISIBLE", "Near the watch area"
+    if distance_miles <= 10:
+        if length_ft is None or length_ft >= 40:
+            return "LIKELY VISIBLE", "Close enough to be a strong visual candidate"
+        return "MAY BE VISIBLE", "Close, but a smaller vessel may be harder to spot"
+    if distance_miles <= 15:
+        if length_ft is not None and length_ft >= 300:
+            return "LIKELY VISIBLE", "Large vessel within the visible zone"
+        return "MAY BE VISIBLE", "Within the visible zone; haze and vessel size matter"
+    return "UNLIKELY VISIBLE", "Outside the configured 15-mile visible zone"
+
+
+def movement_explanation(status: str, speed: float, distance: float,
+                         cpa_distance: float, cpa_minutes: int) -> str:
+    if status == "STATIONARY":
+        return "Stationary / holding position; it may be anchored, moored, or waiting."
+    if status == "APPROACHING":
+        if cpa_minutes > 0:
+            return (
+                f"Approaching the watch area; closest projected pass is "
+                f"{cpa_distance:.1f} mi in about {cpa_minutes} min."
+            )
+        return "Approaching the watch area."
+    if status == "DEPARTING":
+        return "Moving away from the watch area."
+    if status == "PASSING":
+        return "Passing across the watch area at roughly the same distance."
+    return f"Moving at {speed:.1f} kt, {distance:.1f} mi from the watch area."
+
 def build_snapshot() -> dict:
     site_lat = required_float("SITE_LATITUDE")
     site_lon = required_float("SITE_LONGITUDE")
@@ -119,17 +250,35 @@ def build_snapshot() -> dict:
 
         bearing = bearing_degrees(site_lat, site_lon, lat, lon)
 
+        length_ft = vessel_length_ft(vessel)
+        friendly_type, badges = friendly_vessel_type(vessel)
+        visibility_label, visibility_reason = visibility_assessment(
+            current_distance, length_ft
+        )
+
         # Only browser-needed fields are published. Site coordinates and raw
         # vessel coordinates stay inside the GitHub Action.
         all_local_targets.append({
             "mmsi": mmsi,
+            "imo": first_present(vessel, "imo", "IMO"),
+            "callsign": first_present(vessel, "callsign", "callSign", "call_sign"),
             "name": name,
+            "vessel_type": friendly_type,
+            "vessel_type_raw": raw_type_text(vessel),
+            "badges": badges,
+            "length_ft": length_ft,
             "distance_miles": round(current_distance, 2),
             "bearing_degrees": round(bearing, 1),
             "direction": compass_direction(bearing),
             "speed_knots": round(speed, 1),
             "course_degrees": round(course, 1),
             "movement_status": movement_status,
+            "movement_explanation": movement_explanation(
+                movement_status, speed, current_distance,
+                cpa_distance, cpa_minutes
+            ),
+            "visibility_label": visibility_label,
+            "visibility_reason": visibility_reason,
             "cpa_distance_miles": round(cpa_distance, 2),
             "cpa_minutes": cpa_minutes,
             "destination": vessel.get("destination"),

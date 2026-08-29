@@ -449,6 +449,87 @@
             font-size: 20px;
         }
 
+
+        .vessel-type-line {
+            margin-top: 5px;
+            color: var(--muted);
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 10px;
+        }
+
+        .vessel-badge, .visibility-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 5px 9px;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .04em;
+        }
+
+        .vessel-badge {
+            background: #e7eef5;
+            color: var(--navy);
+        }
+
+        .visibility-pill.likely-visible {
+            background: #e7f7cf;
+            color: #355d00;
+        }
+
+        .visibility-pill.may-be-visible {
+            background: #fff2cc;
+            color: #705400;
+        }
+
+        .visibility-pill.unlikely-visible {
+            background: #e7eef5;
+            color: #53687a;
+        }
+
+        .plain-english {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .details-toggle {
+            margin-top: 15px;
+            border: 0;
+            border-radius: 9px;
+            background: var(--navy);
+            color: white;
+            font-weight: 800;
+            padding: 9px 12px;
+            cursor: pointer;
+        }
+
+        .extra-details {
+            display: none;
+            margin-top: 13px;
+            border-top: 1px solid var(--border);
+            padding-top: 13px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--muted);
+        }
+
+        .extra-details.open {
+            display: block;
+        }
+
+        .coming-card {
+            cursor: pointer;
+        }
+
         @media (max-width: 900px) {
             .layout {
                 grid-template-columns: 1fr;
@@ -682,6 +763,32 @@
             });
         }
 
+
+        function visibilityClass(label) {
+            return String(label || "")
+                .toLowerCase()
+                .replaceAll(" ", "-");
+        }
+
+        function badgeHtml(vessel) {
+            const badges = vessel.badges || [];
+            return badges.map(
+                badge => `<span class="vessel-badge">${escapeHtml(badge)}</span>`
+            ).join("");
+        }
+
+        function vesselIdentity(vessel) {
+            const parts = [];
+            if (vessel.vessel_type) parts.push(escapeHtml(vessel.vessel_type));
+            if (vessel.length_ft) parts.push(`${vessel.length_ft} ft`);
+            return parts.join(" • ") || "Vessel";
+        }
+
+        function toggleDetails(id) {
+            const panel = document.getElementById(id);
+            if (panel) panel.classList.toggle("open");
+        }
+
         function backgroundReason(vessel) {
             if (vessel.movement_status === "DEPARTING") {
                 return "Outside visible zone and moving away";
@@ -742,6 +849,18 @@
                         <div>
                             <div class="ship-name">
                                 ${escapeHtml(vessel.name)}
+                            </div>
+                            <div class="vessel-type-line">
+                                ${vesselIdentity(vessel)}
+                            </div>
+                            <div class="badge-row">
+                                <span class="visibility-pill ${visibilityClass(vessel.visibility_label)}">
+                                    ${escapeHtml(vessel.visibility_label || "VISIBILITY UNKNOWN")}
+                                </span>
+                                ${badgeHtml(vessel)}
+                            </div>
+                            <div class="plain-english">
+                                ${escapeHtml(vessel.movement_explanation || "")}
                             </div>
 
                             <div class="distance-row">
@@ -833,6 +952,20 @@
                             </div>
                         </div>
                     </div>
+
+                    <button class="details-toggle"
+                        onclick="toggleDetails('primary-details')">
+                        Vessel details
+                    </button>
+                    <div class="extra-details" id="primary-details">
+                        <div><strong>Type:</strong> ${escapeHtml(vessel.vessel_type || "Unknown")}</div>
+                        <div><strong>Raw AIS type:</strong> ${escapeHtml(vessel.vessel_type_raw || "Not supplied")}</div>
+                        <div><strong>Length:</strong> ${vessel.length_ft ? vessel.length_ft + " ft" : "Not supplied"}</div>
+                        <div><strong>Call sign:</strong> ${escapeHtml(vessel.callsign || "Not supplied")}</div>
+                        <div><strong>IMO:</strong> ${escapeHtml(vessel.imo || "Not supplied")}</div>
+                        <div><strong>MMSI:</strong> ${escapeHtml(vessel.mmsi)}</div>
+                        <div><strong>Visibility:</strong> ${escapeHtml(vessel.visibility_reason || "Unknown")}</div>
+                    </div>
                 </article>
             `;
         }
@@ -867,7 +1000,10 @@
                                 <div class="coming-name">
                                     ${escapeHtml(v.name)}
                                 </div>
-                                <div class="coming-details">
+                                <div class="plain-english">
+                                ${escapeHtml(v.movement_explanation || "")}
+                            </div>
+                            <div class="coming-details">
                                     ${v.distance_miles.toFixed(2)} mi •
                                     ${escapeHtml(v.direction)} •
                                     ${escapeHtml(v.movement_status)}
@@ -906,7 +1042,19 @@
                             <div class="coming-name">
                                 ${escapeHtml(v.name)}
                             </div>
+                            <div class="vessel-type-line">
+                                ${vesselIdentity(v)}
+                            </div>
+                            <div class="badge-row">
+                                <span class="visibility-pill ${visibilityClass(v.visibility_label)}">
+                                    ${escapeHtml(v.visibility_label || "VISIBILITY UNKNOWN")}
+                                </span>
+                                ${badgeHtml(v)}
+                            </div>
 
+                            <div class="plain-english">
+                                ${escapeHtml(v.movement_explanation || "")}
+                            </div>
                             <div class="coming-details">
                                 ${v.distance_miles.toFixed(2)} mi away •
                                 ${v.speed_knots.toFixed(1)} kt •
